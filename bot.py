@@ -14,14 +14,6 @@ from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.errors import FloodWaitError
 from telethon.tl.functions.users import GetFullUserRequest
 
-# Suppress ALL warnings and errors completely
-warnings.filterwarnings('ignore')
-os.environ['PYTHONWARNINGS'] = 'ignore'
-logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.CRITICAL)
-logging.getLogger('telethon').setLevel(logging.CRITICAL)
-logging.getLogger('asyncio').setLevel(logging.CRITICAL)
-logging.disable(logging.CRITICAL)
-
 # ==================== CONFIG ====================
 API_ID = 27896193
 API_HASH = "38a5463cb8bf980d4519fba0ced298c2"
