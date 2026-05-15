@@ -5,6 +5,7 @@ import logging
 import time
 import psutil
 import os
+import json
 import warnings
 from datetime import datetime
 from telethon import TelegramClient, events
@@ -13,43 +14,33 @@ from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelReq
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.errors import FloodWaitError
 from telethon.tl.functions.users import GetFullUserRequest
+from dotenv import load_dotenv
 
-# ==================== CONFIG ====================
-API_ID = 27896193
-API_HASH = "38a5463cb8bf980d4519fba0ced298c2"
-MAIN_OWNER = 5286579067
+# Load environment variables
+load_dotenv()
+
+# ==================== CONFIG FROM .env ====================
+API_ID = int(os.getenv('API_ID', 27896193))
+API_HASH = os.getenv('API_HASH', '38a5463cb8bf980d4519fba0ced298c2')
+MAIN_OWNER = int(os.getenv('MAIN_OWNER', 5286579067))
+AUTO_JOIN_LINK = os.getenv('AUTO_JOIN_LINK', 'https://t.me/TheVillainActive')
+BOT_SPEED = float(os.getenv('BOT_SPEED', 0.3))
+ENABLE_AUTO_JOIN = os.getenv('ENABLE_AUTO_JOIN', 'true').lower() == 'true'
+
+# Load sessions from .env
+SESSIONS = json.loads(os.getenv('SESSIONS_JSON', '[]'))
+
 GLOBAL_SUDO_USERS = []
-AUTO_JOIN_LINK = "https://t.me/TheVillainActive"
-
-# ==================== SESSIONS ====================
-SESSIONS = [
-    {
-        "session_string": "1BVtsOIUBu2u76Y3x2wkvFk1_Ktf23V1QIHrYjcymePz3JyLHpwDVs9VMMHxHi0_NSFQhkHCclq6TvpnIrleDWoqNtw1g0v_BiQNZhP2jHC5zUlpxd4t08cGQRUnem7-4yYsJxmzaDSKO9XWTtI7dZ--yUv5uLdE_uAXN5alevKi_jDiQRq8TelQwg9rvV9GTbbsdOTi_zonwwObrgcHPvHOYCGgEY7ibEGemkfd_QZAkOVOuxiljMGmC4QZ68kBQYXY3RM7pi_qwjSTOFRjLOkPrmRJCc8MVI3lscQlTYcLUSHreEzeTJ9zuWw-NbdDfYHaTw8TAm49nix03_RfpadFNgh0RjR8=",
-        "owner": 1888914657,
-    },
-    {
-        "session_string": "1BVtsOIUBu2Y20vYpEzgrUmto5tzD3zwOFR7nLtP8kC_9SY7ZKbRqua1hSWI9TG0YTdkYWPgnGIfx8wTVJHM6IpyJ8zBrw_lGgxhQBmvYiX6nB0HJ1IMr2QNvGp54-qxkxBXDsVvVG7qXDrEUBonUw5tFmuvfKZgwLpV6w3yTmATmZJgA82K1UXVaMmoJmkYHmBSikx7e7dBMvZBAqdZJ_65E5HihfgkdiAnSxp1geoV-SuIQroCGc4yT54RJeR4YSljS4Gc2t39aHrLYVwmu0zKziVB7mn4rUMmDly3-YcW1u20IR8y3JlADn0W-Bh1IiJYJp3ADM3Lo0IDSJVldUtlKl5cP0bo=",
-        "owner": 1217902673,
-    },
-    {
-        "session_string": "1BVtsOIUBu2Oz8zlkx1yQn4UiWRlDkyNDjMbuavaQaBUVdvJ9N6-f4gtUgm4acFfI-YJ8UPohHp5DIY-arlzPAseCafN4yBX9Nc2K_yJqUqKNOdLh1-IXBTiEHIQbhLbB-HJbs_mNux_jdQxsez0wNwN8I-hZOW_3msjAiTlXexGpyRBFudLiD1JrvPbeA83knhS_ZaH8BLOM7F5oY8kuElramH9Xjw19-lSvATben6_tBfMBk_yIe76LdWIkT91hOz9yqimA6ycWNMrLONYk2BeXUcxam4cQtUcvAND3Y_QG4Mucru56rWmqh8cAEc3zXzCxAq1tQLMnUXP_OnfhkIKmHeuvQQw=",
-        "owner": 1779115399,
-    },
-    {
-        "session_string": "1BVtsOIUBu4psZUT2o1SXwjGDKidxzBo7OO62AW1gPZlUjtgQoJV7YsGaNclNBvCInrL5rGWeKIP_iMLzKl5fYnc5-7iWectoBlz6jYenVjajz7qZbINfW2yrFdJw7qua1Q0eVthkfznjgVCFm-jJIxPkyrrg50XCHSymoveQ9IGp2sR9pYN_sAQD94zyYozAWAlnbnLcrw4t4uSpXLvfrIRv8uN_g0Psb18i4ePwFNIRQ5wZg-ePVB7tAH2I4hqMu9myySNtAU0pFFo2anBS-cH12NAikhwlBlqR7MiOyo6qr0DmL8pt2vCBm8RbrSlWCkVk5OF6NrXaNvVVdDzTROHRBfMC4iw=",
-        "owner": 1347612918,
-    },
-    {
-        "session_string": "1BVtsOIUBu3qRz355jIaEIe5NJcmIdXklbHVRfcbTmX4j5rm9sAWeBXC8CY9aprQg4ueSNLmNZhnpsCj19gHJoVNurJvPdT9csXiMcseWhH6oNwqv0jlad3_rMvpXEp_XmJDGgJOmWhyt2xUOAAMboekzYhIdgrQY4c3sVa4eAuGlG3b5nQJVpxPLg0fZAA8HTToOWW8-6-TrnQFiuq_9BKlcS3i5d5TgW6_xd4M6WJ7QviPtkMHXtnWbd4JpETQ-NGmknW7NYrkSGbW3OtS9KlpkYWdX06g2beOHhT7TrXGSuDED6gzS1vRqh0XyX_IOmfR4mOdUAplhFXEvkxvcW86H6zIs8Nc=",
-        "owner": 6268855785,
-    },
-]
 
 # ==================== ABUSE LIST ====================
 abuse_roast = [
-    l    "𝗧𝗘𝗥𝗜 𝗠𝗔𝗔 𝗞𝗜 𝗖𝗛𝗨𝗧 𝗠𝗘𝗜𝗡 𝟭𝟬𝟬𝟬 𝗟𝗔𝗧𝗛𝗜 𝗗𝗔𝗔𝗟 𝗞𝗔𝗥 𝗖𝗛𝗨𝗗𝗔𝗜 𝗞𝗥𝗨𝗡𝗚𝗔 💀🔥",
-    "
-   "TᏒᎥᎥᎥᎥᎥᎥᎥᎥᎥ mᎪᎪᎪᎪᎪ ᏦᎥᎥᎥᎥᎥᎥ xhuҬҬҬҬҬҬҬ ᎶᎪᏒᎪᎪm hᎪᎪᎪᎥ ᏒᎪᏁᎠᎥ 🤣😂︵‿︵‿︵‿︵‿︵‿█▄▄ ███ █▄▄♥️╣[-_-]╠♥️👅👅"
+    "Good",
+    "Excellent",
+    "Nice try!",
+    "Better luck next time",
+    "Keep going",
+    "Not bad",
+    "Interesting",
 ]
 
 single_raid_msg = abuse_roast.copy()
@@ -338,7 +329,7 @@ async def start_sessions():
                 await client.start()
                 me = await client.get_me()
                 clients[idx] = client
-                delays[idx] = 0.3
+                delays[idx] = BOT_SPEED
                 rr_targets[idx] = None
                 rr_counts[idx] = {}
                 raid_tasks[idx] = False
@@ -354,12 +345,12 @@ async def start_sessions():
                 
                 print(f"[✓] Session {idx} (@{me.username or me.first_name}) | Owner: {data.get('owner')}")
                 
-                try:
-                    if AUTO_JOIN_LINK:
+                if ENABLE_AUTO_JOIN and AUTO_JOIN_LINK:
+                    try:
                         await join_channel_with_discussion(client, AUTO_JOIN_LINK)
                         print(f"  └─ ✅ Auto-joined")
-                except:
-                    pass
+                    except:
+                        pass
                 
                 register_handlers(client, idx)
                 
@@ -1043,14 +1034,15 @@ def register_handlers(client, session_index):
         
         asyncio.create_task(delete_msg_delay(msg, 45))
 
-# ==================== MAIN ====================
-async def main():
+# ==================== MAIN WITH AUTO-RESTART ====================
+async def run_bot():
+    """Main bot function that never stops"""
     print("\n" + "="*60)
-    print("   🔥 MULTI-SESSION USERBOT v12.0 - FINAL")
+    print("   🔥 MULTI-SESSION USERBOT v12.0 - DOCKER READY")
     print("="*60)
     print(f"   👑 OWNER: {MAIN_OWNER}")
     print(f"   📱 TOTAL SESSIONS: {len(SESSIONS)}")
-    print(f"   ⚡ DEFAULT SPEED: 0.3s")
+    print(f"   ⚡ DEFAULT SPEED: {BOT_SPEED}s")
     print(f"   💯 CLICKABLE: <a href='tg://openmessage?user_id=ID'>NAME or ID</a>")
     print("="*60)
     
@@ -1071,22 +1063,47 @@ async def main():
         
         print("   🟢 BOT IS RUNNING...")
         print("   💡 Click on ANY mention - profile will open!")
-        print("   💡 Format: <a href='tg://openmessage?user_id=ID'>NAME</a>")
         print("   📝 TYPE .help IN ANY CHAT\n")
         
-        try:
-            await asyncio.Event().wait()
-        except KeyboardInterrupt:
-            print("\n\n   🛑 SHUTTING DOWN...")
-            await graceful_shutdown()
-            print("   👋 BYE!\n")
+        # Infinite loop - bot never stops
+        while not shutdown_flag:
+            await asyncio.sleep(1)
+            # Check if all clients are still connected
+            for idx, client in list(clients.items()):
+                if not client.is_connected():
+                    try:
+                        print(f"[!] Session {idx} disconnected, reconnecting...")
+                        await client.connect()
+                        if not client.is_connected():
+                            await client.start()
+                        print(f"[✓] Session {idx} reconnected")
+                    except Exception as e:
+                        print(f"[✗] Failed to reconnect session {idx}: {e}")
+        
+        await graceful_shutdown()
     else:
         print("\n   ❌ NO SESSIONS STARTED!")
+        # Wait and retry if no sessions
+        await asyncio.sleep(10)
+
+async def main():
+    """Main entry point with auto-restart on crash"""
+    while True:
+        try:
+            await run_bot()
+        except KeyboardInterrupt:
+            print("\n\n   🛑 SHUTDOWN SIGNAL RECEIVED")
+            break
+        except Exception as e:
+            print(f"\n   ❌ BOT CRASHED: {e}")
+            print("   🔄 RESTARTING IN 5 SECONDS...")
+            await asyncio.sleep(5)
+            continue
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n   👋 STOPPED!")
+        print("\n\n   👋 BYE!")
     except Exception as e:
-        print(f"\n   ❌ ERROR: {e}")
+        print(f"\n   ❌ FATAL ERROR: {e}")
