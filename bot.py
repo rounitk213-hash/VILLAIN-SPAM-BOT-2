@@ -5,7 +5,6 @@ import logging
 import time
 import psutil
 import os
-import json
 import warnings
 from datetime import datetime
 from telethon import TelegramClient, events
@@ -27,8 +26,23 @@ AUTO_JOIN_LINK = os.getenv('AUTO_JOIN_LINK', 'https://t.me/TheVillainActive')
 BOT_SPEED = float(os.getenv('BOT_SPEED', 0.3))
 ENABLE_AUTO_JOIN = os.getenv('ENABLE_AUTO_JOIN', 'true').lower() == 'true'
 
-# Load sessions from .env
-SESSIONS = json.loads(os.getenv('SESSIONS_JSON', '[]'))
+# Load sessions from individual environment variables
+SESSIONS = []
+session_index = 1
+while True:
+    session_string = os.getenv(f'SESSION{session_index}_STRING')
+    session_owner = os.getenv(f'SESSION{session_index}_OWNER')
+    
+    if session_string and session_owner:
+        SESSIONS.append({
+            "session_string": session_string,
+            "owner": int(session_owner)
+        })
+        session_index += 1
+    else:
+        break
+
+print(f"[+] Loaded {len(SESSIONS)} sessions from environment variables")
 
 GLOBAL_SUDO_USERS = []
 
@@ -126,51 +140,7 @@ async def get_user_real_name(client, user_id):
         except:
             pass
     
-    # METHOD 3: Try from dialogs
-    if not name:
-        try:
-            async for dialog in client.iter_dialogs():
-                if dialog.entity and hasattr(dialog.entity, 'id') and dialog.entity.id == user_id:
-                    if hasattr(dialog.entity, 'first_name') and dialog.entity.first_name:
-                        name = dialog.entity.first_name
-                        break
-                    elif hasattr(dialog.entity, 'title'):
-                        name = dialog.entity.title
-                        break
-        except:
-            pass
-    
-    # METHOD 4: Try from message history
-    if not name:
-        try:
-            async for msg in client.iter_messages(None, from_user=user_id, limit=1):
-                if msg.sender and msg.sender.first_name:
-                    name = msg.sender.first_name
-                    break
-        except:
-            pass
-    
-    # METHOD 5: Try to find in common groups
-    if not name:
-        try:
-            async for dialog in client.iter_dialogs():
-                if dialog.is_group or dialog.is_channel:
-                    try:
-                        async for user in client.iter_participants(dialog.entity):
-                            if user.id == user_id:
-                                if user.first_name:
-                                    name = user.first_name
-                                elif user.last_name:
-                                    name = user.last_name
-                                break
-                        if name:
-                            break
-                    except:
-                        pass
-        except:
-            pass
-    
-    # Fallback: use ID as name (but still clickable)
+    # Fallback: use ID as name
     if not name:
         name = str(user_id)
     
@@ -186,32 +156,6 @@ async def get_user_real_name(client, user_id):
 def make_clickable_mention(name, user_id):
     """Create clickable mention with tg://openmessage?user_id= format"""
     return f'<a href="tg://openmessage?user_id={user_id}">{name}</a>'
-
-async def send_bulk_clickable_mentions(client, chat_id, user_ids, message_text, reply_to=None):
-    """Send message with multiple CLICKABLE mentions - ALWAYS shows something clickable"""
-    try:
-        mentions = []
-        for uid in user_ids:
-            name = await get_user_real_name(client, uid)
-            mentions.append(make_clickable_mention(name, uid))
-        
-        final_text = f"{message_text}\n\n{' '.join(mentions)}"
-        
-        if reply_to:
-            await client.send_message(chat_id, final_text, parse_mode='html', reply_to=reply_to)
-        else:
-            await client.send_message(chat_id, final_text, parse_mode='html')
-    except Exception as e:
-        # Ultimate fallback - send IDs as clickable
-        try:
-            fallback_mentions = [make_clickable_mention(str(uid), uid) for uid in user_ids]
-            final_text = f"{message_text}\n\n{' '.join(fallback_mentions)}"
-            if reply_to:
-                await client.send_message(chat_id, final_text, parse_mode='html', reply_to=reply_to)
-            else:
-                await client.send_message(chat_id, final_text, parse_mode='html')
-        except:
-            pass
 
 async def delete_msg(msg):
     try:
@@ -627,7 +571,7 @@ def register_handlers(client, session_index):
         raid_tasks[session_index] = False
         await safe_reply(event, "✅ <b>RAID Stopped!</b>", 1)
     
-    # ==================== .fr - FINAL FIXED ====================
+    # ==================== .fr ====================
     @client.on(events.NewMessage(pattern=r'^\.fr'))
     async def fr_handler(event):
         if shutdown_flag:
@@ -722,7 +666,7 @@ def register_handlers(client, session_index):
                 try:
                     await anti_flood_wait(session_index)
                     
-                    # Build mentions dynamically each loop (to handle any new cache entries)
+                    # Build mentions dynamically each loop
                     mentions = []
                     for uid in targets:
                         name = await get_user_real_name(client, uid)
@@ -1043,7 +987,6 @@ async def run_bot():
     print(f"   👑 OWNER: {MAIN_OWNER}")
     print(f"   📱 TOTAL SESSIONS: {len(SESSIONS)}")
     print(f"   ⚡ DEFAULT SPEED: {BOT_SPEED}s")
-    print(f"   💯 CLICKABLE: <a href='tg://openmessage?user_id=ID'>NAME or ID</a>")
     print("="*60)
     
     await start_sessions()
@@ -1062,7 +1005,6 @@ async def run_bot():
         print("="*60 + "\n")
         
         print("   🟢 BOT IS RUNNING...")
-        print("   💡 Click on ANY mention - profile will open!")
         print("   📝 TYPE .help IN ANY CHAT\n")
         
         # Infinite loop - bot never stops
