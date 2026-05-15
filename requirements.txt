@@ -1,5 +1,3 @@
-telethon==1.34.0
-psutil==5.9.6
-aiohttp==3.9.1
-pyaes==1.6.1
-rsa==4.9
+telethon==1.36.0
+psutil==5.9.8
+python-dotenv==1.0.0
